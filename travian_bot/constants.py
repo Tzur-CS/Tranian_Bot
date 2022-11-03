@@ -1,0 +1,16 @@
+NAVIGATION = "navigation"
+BUILDING_SLOT = "buildingSlot"
+BUILDING_LIST = "buildingList"
+buildingSlot = "buildingSlot{loc}"
+WOOD = 'wood'
+CLAY = 'clay'
+IRON = 'iron'
+CROP = 'crop'
+RSS = [WOOD, CLAY, IRON, CROP]
+RSS_ICON = "resourceView"
+BUILDING_ICON = "buildingView"
+MAP_ICON = "map"
+STATISTICS_ICON = "statistics"
+REPORT_ICON = "reports"
+MESSAGES_ICON = "messages"
+DAILY_QUESTS_ICON ="dailyQuests"
