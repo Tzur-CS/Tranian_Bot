@@ -35,8 +35,10 @@ class TravianBot:
         self.task_queue = queue.Queue()
         self.function_dic = {"up_b": self.upgrade_building, "b_b": self.upgrade_building,
                              "up_f": self.upgrade_filed, "w_q": self.work_queue}
+        self.villages_list = list()
         schedule.every(1).minutes.do(self.next_task)
         schedule.every(1).minutes.do(self.p)
+        self.villages_task = {"1": queue.Queue()}
 
     def p(self):
         print("test")
@@ -127,30 +129,28 @@ class TravianBot:
     #     if self.is_exist(By.ID, const.NAVIGATION):
     #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "dailyQuests").click()
 
-    def add_to_queue(self, function, fun_input):
-        """
+    def add_to_queue(self, function, fun_input, villages_num):
+        """ construction
         this method push to the task queue a new task
+        :param villages_num:
         :param function: what kind of task to do
         :param fun_input: function parameters
         :return: None
         """
-        self.task_queue.put((function, fun_input))
+        task_queue_v = self.villages_task.get(villages_num)
+        task_queue_v.put((function, fun_input))
+        # self.task_queue.put((function, fun_input))
 
-    def get_next_function(self):
-        """
-        get the next task from the task queue and exsuit it
-        :return:
-        """
-        if self.task_queue.qsize() > 0:
-            action = self.task_queue.get()
-            if action[0] == "up":
-                if action[1] in const.RSS:
-                    self.upgrade_filed(action[1])
-                    return
-                else:
-                    self.upgrade_building(action[1])
-                    return
-            self.function_dic[action[0]](action[1])
+    def update_villages_list(self):
+        if self.is_exist(By.ID, "sidebarBoxVillagelist"):
+            villages_icon = self.driver.find_element(By.ID, "sidebarBoxVillagelist")
+            villages_list_icon = villages_icon.find_element(By.CLASS_NAME, "villageList")
+            for village in villages_list_icon.find_elements(By.CLASS_NAME, "dropContainer"):
+                village_num = village.get_attribute("data-sortindex")
+                village_name = village.find_element(By.CLASS_NAME, "coordinatesGrid").get_attribute("data-villagename")
+                self.villages_task[village_num] = queue.Queue()
+
+
 
     def updated_rss(self):
         """
@@ -247,6 +247,14 @@ class TravianBot:
         :return:
         """
         self.click_navigation(const.BUILDING_ICON)
+        if building_name == "Rally Point":
+            for slot in self.driver.find_elements(By.CLASS_NAME, const.BUILDING_SLOT):
+                if building_name == "Rally Point" and slot.get_attribute("data-aid") == "39":
+                    slot.click()
+                    self.driver.find_element(By.CLASS_NAME, "buildingWrapper")\
+                        .find_element(By.TAG_NAME, "button").click()
+                    return
+
         for slot in self.driver.find_elements(By.CLASS_NAME, const.BUILDING_SLOT):
             if slot.text == "":
                 slot.find_element(By.TAG_NAME, "path").click()
@@ -353,19 +361,41 @@ class TravianBot:
             if next_action == "c":
                 return
 
+    def get_next_function(self, village_queue):
+        """
+        get the next task from the task queue and exsuit it
+        :return:
+        """
+        # for village_num_queue in self.villages_task.items():
+        #     village_queue = village_num_queue[1]
+        #     village_num = village_num_queue[0]
+        if village_queue.qsize() > 0:
+            action = village_queue.get()
+            if action[0] == "up":
+                if action[1] in const.RSS:
+                    self.upgrade_filed(action[1])
+                    return
+                else:
+                    self.upgrade_building(action[1])
+                    return
+            self.function_dic[action[0]](action[1])
+
     def next_task(self):
         """
 
         :return:
         """
-        if self.can_build():
-            self.get_next_function()
+        for village_items in self.villages_task.items():
+            self.villages_list_chenger(village_items[0])
+            if self.can_build():
+                self.get_next_function(village_items[1])
 
     def play(self):
         """
 
         :return:
         """
+
         while True:
             schedule.run_pending()
             if keyboard.is_pressed("a"):
@@ -387,9 +417,6 @@ class TravianBot:
         print("Building List:")
         if self.is_exist(By.CLASS_NAME, const.BUILDING_LIST):
             if len(self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME,
-                                                                                              'name')) == 0:
-                print("no building list, to build something?")
-            elif len(self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME,
                                                                                                 'name')) == 1:
                 print(self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME, 'name')[
                           0].text +
@@ -411,7 +438,23 @@ class TravianBot:
                       self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME,
                                                                                                  'buildDuration')[
                           1].text)
+        else:
+            print("no building list, to build something?")
         print("-" * 60)
+
+    def villages_list_chenger(self, village_num):
+        if self.is_exist(By.ID, "sidebarBoxVillagelist"):
+            villages_icon = self.driver.find_element(By.ID, "sidebarBoxVillagelist")
+            villages_list_icon = villages_icon.find_element(By.CLASS_NAME, "villageList")
+            for village in villages_list_icon.find_elements(By.CLASS_NAME, "dropContainer"):
+                if village.get_attribute("data-sortindex") == village_num:
+                    village.click()
+
+    def new_village(self):
+        pass
+
+    def new_village_day_one(self):
+        pass
 
 
 
