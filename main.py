@@ -9,6 +9,10 @@ SERVER_PATH_X2_ASIA = "https://ts20.x2.asia.travian.com/"
 
 def run(botr):
     botr.login_to_user()
+    botr.villages_list_chenger("2")
+    botr.villages_list_chenger("1")
+    botr.villages_list_chenger("2")
+    botr.villages_list_chenger("1")
     botr.play()
 
 

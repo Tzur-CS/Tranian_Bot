@@ -396,6 +396,8 @@ class TravianBot:
         :return:
         """
 
+        self.update_villages_list()
+
         while True:
             schedule.run_pending()
             if keyboard.is_pressed("a"):
@@ -449,6 +451,8 @@ class TravianBot:
             for village in villages_list_icon.find_elements(By.CLASS_NAME, "dropContainer"):
                 if village.get_attribute("data-sortindex") == village_num:
                     village.click()
+                    time.sleep(5)
+                    return
 
     def new_village(self):
         pass
