@@ -9,10 +9,24 @@ SERVER_PATH_X2_ASIA = "https://ts20.x2.asia.travian.com/"
 
 def run(botr):
     botr.login_to_user()
-    botr.villages_list_chenger("2")
-    botr.villages_list_chenger("1")
-    botr.villages_list_chenger("2")
-    botr.villages_list_chenger("1")
+    # botr.villages_list_chenger("2")
+    botr.new_village_day_one("2")
+    # botr.get_next_task(botr.villages_task["2"])
+    # time.sleep(5)
+    # print("______________")
+    # botr.get_next_task(botr.villages_task["2"])
+    # time.sleep(5)
+    # print("______________")
+    botr.task_to_village("up", "Cranny", "1")
+    # time.sleep(5)
+    # print("______________")
+    botr.task_to_village("up", "Cranny", "1")
+    # time.sleep(5)
+    # print("______________")
+    botr.work_queue()
+
+    # botr.new_village_day_one("2")
+    # botr.next_task()
     botr.play()
 
 

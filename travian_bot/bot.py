@@ -1,23 +1,23 @@
 from selenium import webdriver
-import queue
 from travian_bot import constants as const
 import keyboard as keyboard
 import schedule
 from selenium.common import WebDriverException
 from selenium.webdriver.common.by import By
+import queue
+import time
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.select import Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-import time
 import DownloadMap
 
 # https://t4.answers.travian.com/?view=answers&action=answer&aid=217
-PATH = "C:\Program Files (x86)\chromedriver.exe"
-SERVER_PATH_X2_AMERICA = "https://ts20.x2.america.travian.com/"
-SERVER_PATH_X2_ASIA = "https://ts20.x2.asia.travian.com/"
-USER_NAME = "GloryToEladR"  # "GloryToelad"
-PASSWORD = "bottestv1"
+# PATH = "C:\Program Files (x86)\chromedriver.exe"
+# SERVER_PATH_X2_AMERICA = "https://ts20.x2.america.travian.com/"
+# SERVER_PATH_X2_ASIA = "https://ts20.x2.asia.travian.com/"
+# USER_NAME = "GloryToEladR"  # "GloryToelad"
+# PASSWORD = "bottestv1"
 
 normal_village = {"wood": [1, 3, 14, 17], "crop": [2, 8, 9, 12, 13, 15], "clay": [5, 6, 16, 18],
                   "iron": [4, 7, 10, 11]}
@@ -28,20 +28,21 @@ class TravianBot:
         self.driver_path = driver_path
         self.option = webdriver.ChromeOptions()
         # self.option.add_argument('headless')
-        self.driver = webdriver.Chrome(PATH, options=self.option)
+        self.driver = webdriver.Chrome(const.PATH, options=self.option)
         self.driver.get(driver_path)
         self.driver.implicitly_wait(15)
-        self.current_rss = {"wood": 0, "clay": 0, "iron": 0, "crop": 0}
-        self.task_queue = queue.Queue()
+        # self.rss_per_village = {"1" : {"wood": 0, "clay": 0, "iron": 0, "crop": 0}}
+        self.rss_per_village = {}
+        self.villages_task = dict()
         self.function_dic = {"up_b": self.upgrade_building, "b_b": self.upgrade_building,
                              "up_f": self.upgrade_filed, "w_q": self.work_queue}
-        self.villages_list = list()
+        # self.task_queue = queue.Queue()
+        # self.villages_list = list()
         schedule.every(1).minutes.do(self.next_task)
         schedule.every(1).minutes.do(self.p)
-        self.villages_task = {"1": queue.Queue()}
 
     def p(self):
-        print("test")
+        print("schedule")
 
     def str_to_int(self, value: str):
         """
@@ -75,17 +76,18 @@ class TravianBot:
         :return: None
         """
         search = self.driver.find_elements(By.CLASS_NAME, "text")
-        search[0].send_keys(USER_NAME)
-        search[1].send_keys(PASSWORD)
+        search[0].send_keys(const.USER_NAME)
+        search[1].send_keys(const.PASSWORD)
         if self.is_exist(By.ID, 'cmpbntyestxt'):
             for cookies in self.driver.find_elements(By.ID, 'cmpbntyestxt'):
                 if "Accept all" in cookies.text:
                     cookies.click()
-        if self.is_exist(By.TAG_NAME, "button"):
-            buttons = self.driver.find_elements(By.TAG_NAME, "button")
+        if self.is_exist(By.TAG_NAME, const.BUTTON):
+            buttons = self.driver.find_elements(By.TAG_NAME, const.BUTTON)
             for button in buttons:
-                if "Login" in button.text:
+                if const.LOGIN in button.text:
                     button.click()
+        self.update_villages_map()
         time.sleep(1)
 
     def click_navigation(self, icon: str):
@@ -97,60 +99,31 @@ class TravianBot:
         if self.is_exist(By.ID, const.NAVIGATION):
             self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, icon).click()
 
-    # def click_resources(self):
-    #     """
-    #
-    #     :return:
-    #     """
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "resourceView").click()
-    #
-    # def click_buildings(self):
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "buildingView").click()
-    #
-    # def click_map(self):
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "map").click()
-    #
-    # def click_statistics(self):
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "statistics").click()
-    #
-    # def click_report(self):
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "reports").click()
-    #
-    # def click_messages(self):
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "messages").click()
-    #
-    # def daily_quests(self):
-    #     if self.is_exist(By.ID, const.NAVIGATION):
-    #         self.driver.find_element(By.ID, const.NAVIGATION).find_element(By.CLASS_NAME, "dailyQuests").click()
-
-    def add_to_queue(self, function, fun_input, villages_num):
+    def task_to_village(self, task : str, task_input: str, village_num : str):
         """ construction
         this method push to the task queue a new task
-        :param villages_num:
-        :param function: what kind of task to do
-        :param fun_input: function parameters
+        :param village_num:
+        :param task: what kind of task to do
+        :param task_input: function parameters
         :return: None
         """
-        task_queue_v = self.villages_task.get(villages_num)
-        task_queue_v.put((function, fun_input))
+        task_queue_v = self.villages_task[village_num]
+        task_queue_v.put((task, task_input))
         # self.task_queue.put((function, fun_input))
 
-    def update_villages_list(self):
+    def update_villages_map(self):
         if self.is_exist(By.ID, "sidebarBoxVillagelist"):
             villages_icon = self.driver.find_element(By.ID, "sidebarBoxVillagelist")
             villages_list_icon = villages_icon.find_element(By.CLASS_NAME, "villageList")
             for village in villages_list_icon.find_elements(By.CLASS_NAME, "dropContainer"):
                 village_num = village.get_attribute("data-sortindex")
-                village_name = village.find_element(By.CLASS_NAME, "coordinatesGrid").get_attribute("data-villagename")
-                self.villages_task[village_num] = queue.Queue()
-
-
+                village_name = village.find_element(By.CLASS_NAME, "coordinatesGrid") \
+                    .get_attribute("data-villagename")
+                # self.villages_task[village_num] = queue.Queue()
+                print(village_num + " " + village_name + " map added.")
+                new_queue = queue.Queue()
+                self.villages_task[village_num] = new_queue
+            print("done with update villages map.")
 
     def updated_rss(self):
         """
@@ -161,13 +134,14 @@ class TravianBot:
         if self.is_exist(By.CLASS_NAME, "stockBarButton"):
             all_rss = self.driver.find_elements(By.CLASS_NAME, "stockBarButton")
             for i in range(0, 4):
-                self.current_rss[const.RSS[i]] = self.str_to_int(all_rss[i].text)
+                self.rss_per_village[const.RSS[i]] = self.str_to_int(all_rss[i].text)
 
     def can_build(self):
         """
 
         :return:
         """
+        self.click_navigation(const.RSS_ICON)
         if not self.is_exist(By.ID, 'resourceFieldContainer'):
             self.click_navigation(const.RSS_ICON)
         if self.is_exist(By.CLASS_NAME, const.BUILDING_LIST):
@@ -251,7 +225,7 @@ class TravianBot:
             for slot in self.driver.find_elements(By.CLASS_NAME, const.BUILDING_SLOT):
                 if building_name == "Rally Point" and slot.get_attribute("data-aid") == "39":
                     slot.click()
-                    self.driver.find_element(By.CLASS_NAME, "buildingWrapper")\
+                    self.driver.find_element(By.CLASS_NAME, "buildingWrapper") \
                         .find_element(By.TAG_NAME, "button").click()
                     return
 
@@ -273,8 +247,10 @@ class TravianBot:
 
         :return:
         """
-        for work in self.task_queue.queue:
-            print(work)
+        for village in self.villages_task.items():
+            print("tasks for villages: " + village[0])
+            for task in village[1].queue:
+                print(task)
 
     def upgrade_filed(self, rss_type, village_type=normal_village):
         """
@@ -356,12 +332,12 @@ class TravianBot:
                     return
                 print("parameters:")
                 parameters = input()
-                self.add_to_queue(next_action, parameters)
+                self.task_to_village(next_action, parameters)
                 return
             if next_action == "c":
                 return
 
-    def get_next_function(self, village_queue):
+    def get_next_task(self, village_queue):
         """
         get the next task from the task queue and exsuit it
         :return:
@@ -371,6 +347,7 @@ class TravianBot:
         #     village_num = village_num_queue[0]
         if village_queue.qsize() > 0:
             action = village_queue.get()
+            print(action)
             if action[0] == "up":
                 if action[1] in const.RSS:
                     self.upgrade_filed(action[1])
@@ -385,19 +362,21 @@ class TravianBot:
 
         :return:
         """
+        print("we entered to next task method")
         for village_items in self.villages_task.items():
             self.villages_list_chenger(village_items[0])
+            print("we are in next task what to go to vellage " + village_items[0])
+            time.sleep(0.5)
             if self.can_build():
-                self.get_next_function(village_items[1])
+                village_current_task = village_items[1]
+                print(village_current_task)
+                self.get_next_task(village_items[1])
 
     def play(self):
         """
 
         :return:
         """
-
-        self.update_villages_list()
-
         while True:
             schedule.run_pending()
             if keyboard.is_pressed("a"):
@@ -410,21 +389,21 @@ class TravianBot:
         """
         self.click_navigation(const.RSS_ICON)
         print("-" * 60)
-        print("The current status of " + USER_NAME + ":")
+        print("The current status of " + const.USER_NAME + ":")
         self.updated_rss()
-        print("wood: {wood}, clay: {clay}, iron: {iron}, crop: {crop}".format(wood=self.current_rss[const.WOOD],
-                                                                              clay=self.current_rss[const.CLAY],
-                                                                              iron=self.current_rss[const.IRON],
-                                                                              crop=self.current_rss[const.CROP]))
+        print("wood: {wood}, clay: {clay}, iron: {iron}, crop: {crop}".format(wood=self.rss_per_village[const.WOOD],
+                                                                              clay=self.rss_per_village[const.CLAY],
+                                                                              iron=self.rss_per_village[const.IRON],
+                                                                              crop=self.rss_per_village[const.CROP]))
         print("Building List:")
         if self.is_exist(By.CLASS_NAME, const.BUILDING_LIST):
             if len(self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME,
-                                                                                                'name')) == 1:
+                                                                                              'name')) == 1:
                 print(self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME, 'name')[
                           0].text +
                       " finished in: " +
                       self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME,
-                                                                                            'buildDuration')[
+                                                                                                 'buildDuration')[
                           0].text)
             elif len(self.driver.find_element(By.CLASS_NAME, const.BUILDING_LIST).find_elements(By.CLASS_NAME,
                                                                                                 'name')) == 2:
@@ -451,15 +430,24 @@ class TravianBot:
             for village in villages_list_icon.find_elements(By.CLASS_NAME, "dropContainer"):
                 if village.get_attribute("data-sortindex") == village_num:
                     village.click()
-                    time.sleep(5)
+                    time.sleep(1)
                     return
 
     def new_village(self):
         pass
 
-    def new_village_day_one(self):
-        pass
+    def new_village_day_one(self, village_num):
+        # build warehouse and granary to lv 9 and 5 TODO: if the lv is high dont upgrade
+        # for i in range(10):
+        #     self.add_to_queue(self.upgrade_building, "Warehouse", village_num)
+        # for i in range(6):
+        #     self.add_to_queue(self.upgrade_building, "Granary", village_num)
 
+        # build main building lv 20 with gold if we have any gold TODO: add a gold use option
+        for i in range(20):
+            self.task_to_village("up", "Main Building", village_num)
 
+        for i in range(73):
+            self.task_to_village("up", const.RSS[i % 4], village_num)
 
 # schedule.every(5).minutes.do(next_task)
